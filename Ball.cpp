@@ -4,12 +4,12 @@
 Ball::Ball(float mX, float mY)
 {
     // Apply ball properties
-    ballShape.setPosition(mX, mY);
+    ballShape.setPosition({mX, mY});
     ballShape.setRadius(ballRadius);
     ballShape.setFillColor(sf::Color(234, 255, 230));
-    //ballShape.setOutlineColor(sf::Color::Red);
-    // ballShape.setOutlineThickness(5);
-    ballShape.setOrigin(ballRadius, ballRadius);
+    // ballShape.setOutlineColor(sf::Color::Red);
+    //  ballShape.setOutlineThickness(5);
+    ballShape.setOrigin({ballRadius, ballRadius});
 }
 
 void Ball::moveBall()

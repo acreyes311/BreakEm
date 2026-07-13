@@ -3,10 +3,10 @@
 Platform::Platform(float mX, float mY)
 {
     // Apply platform properties
-    rectangle.setPosition(mX, mY);
+    rectangle.setPosition({mX, mY});
     rectangle.setSize({platformWidth, platformHeight});
     rectangle.setFillColor(sf::Color(230, 251, 255));
-    rectangle.setOrigin(platformWidth / 2.f, platformHeight / 2.f);
+    rectangle.setOrigin({platformWidth / 2.f, platformHeight / 2.f});
 }
 
 void Platform::movePlatform()
