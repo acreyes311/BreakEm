@@ -1,6 +1,6 @@
 /*
  * Andrew Reyes
- * Simple brick breaker game project using SFML.
+ * Simple brick breaker game project using SFML 3.0.1.
  * date: 7-5-26
  * SFML doc: https://www.sfml-dev.org/documentation/2.5.1/index.php
  */
@@ -24,9 +24,20 @@ bool intersect(T1 &objA, T2 &objB);
 void testCollision(Ball &myBall, Platform &myPlatform);
 void testCollision(Ball &myBall, Brick &myBrick);
 void createBricks(std::vector<Brick> &bricks);
-void processEvents(sf::RenderWindow &window);
-// void updateGame();
-// void render();
+void processEvents(sf::RenderWindow &window, bool &shouldExit);
+void updateGame(Ball &ball, Platform &platform, std::vector<Brick> &bricks);
+void drawMenu(sf::RenderWindow &window,
+              const sf::Text &titleText,
+              const sf::Text &startText,
+              const sf::Text &exitText,
+              int selectedOption);
+void renderGame(sf::RenderWindow &window,
+                sf::RectangleShape &wallpaper,
+                const Ball &ball,
+                const Platform &platform,
+                const std::vector<Brick> &bricks,
+                const sf::Text &scoreText,
+                const sf::Text &escText);
 
 int main()
 {
@@ -45,96 +56,206 @@ int main()
     wallpaper.setSize({windowWidth, windowHeight});
     wallpaper.setTexture(&texture);
 
-    // Create ball at the center of window
-    Ball ball(windowWidth / 2.f, windowHeight / 2.f);
-
-    // Create platform at bottom of window
-    Platform platform(windowWidth / 2.f, windowHeight - 65.f);
-
-    // Vector of Bricks.
-    std::vector<Brick> bricks;
-
-    // Fill in bricks vector in a grid pattern with an offset between them.
-    // 11 columns x 5 rows. 55 bricks for now
-    const int columns = 11;
-    const int rows = 5;
-
-    for (int xCoord = 0; xCoord < columns; ++xCoord)
-    {
-        for (int yCoord = 0; yCoord < rows; ++yCoord)
-        {
-            const float x = (xCoord + 1) * (blockWidth + 3.f) + 22.f;
-            const float y = (yCoord + 2) * (blockHeight + 3.f);
-            bricks.emplace_back(x, y);
-        }
-    }
-
     // Load Font from File and set Text.
     // Position at bottom right.
     sf::Font font;
     if (!font.openFromFile("ArcheryBlack.ttf"))
         return 1;
 
-    sf::Text scoreText(font, "Lives: ", 14);
-    scoreText.setFillColor(sf::Color::White);
-    scoreText.setPosition({windowWidth - 100, windowHeight - 25});
+    // Menu text objects
+    sf::Text titleText(font, "BreakEm", 48);
+    titleText.setFillColor(sf::Color::White);
+    titleText.setPosition({windowWidth / 2.f - 90.f, windowHeight / 3.f});
 
-    sf::Text escText(font, "Press 'Esc' to exit.", 14);
-    escText.setFillColor(sf::Color::White);
-    escText.setPosition({0, windowHeight - 25});
+    sf::Text startText(font, "Start", 30);
+    startText.setFillColor(sf::Color::White);
+    startText.setPosition({windowWidth / 2.f - 45.f, windowHeight / 2.f});
+
+    sf::Text exitText(font, "Exit", 30);
+    exitText.setFillColor(sf::Color::White);
+    exitText.setPosition({windowWidth / 2.f - 35.f, windowHeight / 2.f + 60.f});
+
+    bool inMenu = true;
+    int selectedOption = 0; // 0 for Start, 1 for Exit
 
     // Game Loop
     while (window.isOpen())
     {
-        // Clear window with color
-        // window.clear();
+        bool shouldExit = false;
+        processEvents(window, shouldExit);
+        if (shouldExit)
+            break;
 
-        // Press Escape to break loop and Exit game. Per SFML doc
-        while (const std::optional event = window.pollEvent())
+        if (inMenu)
         {
-            // Window closed or escape key pressed: exit
-            if (event->is<sf::Event::Closed>() ||
-                (event->is<sf::Event::KeyPressed>() &&
-                 event->getIf<sf::Event::KeyPressed>()->code == sf::Keyboard::Key::Escape))
+            // Move the menu selection with the arrow keys or W/S.
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) ||
+                sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S))
+            {
+                selectedOption = 1;
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up) ||
+                     sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W))
+            {
+                selectedOption = 0;
+            }
+
+            drawMenu(window, titleText, startText, exitText, selectedOption);
+
+            // Menu selection with Enter key or select exit.
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter))
+            {
+                if (selectedOption == 0)
+                {
+                    inMenu = false;
+                }
+                else
+                {
+                    window.close();
+                    break;
+                }
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape))
+            {
                 window.close();
+                break;
+            }
+
+            continue;
         }
 
-        // Update and move the ball and platform every loop iteration
-        ball.moveBall();
-        platform.movePlatform();
+        Ball ball(windowWidth / 2.f, windowHeight / 2.f);
+        Platform platform(windowWidth / 2.f, windowHeight - 65.f);
+        std::vector<Brick> bricks;
+        createBricks(bricks);
 
-        // Test collision every loop iteration
-        testCollision(ball, platform);
+        sf::Text scoreText(font, "Lives: ", 14);
+        scoreText.setFillColor(sf::Color::White);
+        scoreText.setPosition({windowWidth - 100.f, windowHeight - 25.f});
 
-        for (auto &brick : bricks)
-            testCollision(ball, brick);
+        sf::Text escText(font, "Press 'Esc' to exit.", 14);
+        escText.setFillColor(sf::Color::White);
+        escText.setPosition({0.f, windowHeight - 25.f});
 
-        /** Using erase-move idiom to remove all hit bricks from bricks vector
-         *   effectively remove range from first destroyed brick to last.
-         *   use of erase() and remove_if()
-         *   auto iterator = remove_if(begin(bricks), end(bricks), [](const Brick& mBrick) return mBrick.destroyed;})
-         */
-        bricks.erase(std::remove_if(bricks.begin(), bricks.end(), [](const Brick &b)
-                                    { return b.hasBeenHit; }),
-                     bricks.end());
+        while (window.isOpen())
+        {
+            bool shouldExitGame = false;
+            processEvents(window, shouldExitGame);
+            if (shouldExitGame)
+                break;
 
-        // draw onto window
-        window.clear();
-        window.draw(wallpaper);
-        window.draw(ball.ballShape);
-        window.draw(platform.rectangle);
-        window.draw(scoreText);
-        window.draw(escText);
+            updateGame(ball, platform, bricks);
+            renderGame(window, wallpaper, ball, platform, bricks, scoreText, escText);
 
-        // draw every brick onto window
-        for (auto &brick : bricks)
-            window.draw(brick.brickShape);
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape))
+                break;
+        }
 
-        // display rendered window
-        window.display();
+        inMenu = true;
     }
 
     return 0;
+}
+
+// Create the brick grid and center it horizontally inside the window.
+void createBricks(std::vector<Brick> &bricks)
+{
+    constexpr float spacing = 3.f;
+    constexpr float offsetY = 40.f;
+    constexpr int columns = 11;
+    constexpr int rows = 5;
+
+    const float totalWidth = columns * blockWidth + (columns - 1) * spacing;
+    const float startX = (windowWidth - totalWidth) / 2.f + blockWidth / 2.f;
+
+    for (int row = 0; row < rows; ++row)
+    {
+        for (int col = 0; col < columns; ++col)
+        {
+            const float x = startX + col * (blockWidth + spacing);
+            const float y = offsetY + row * (blockHeight + spacing);
+            bricks.emplace_back(x, y);
+        }
+    }
+}
+
+// Handle close events and the Escape key so the game can shut down cleanly.
+void processEvents(sf::RenderWindow &window, bool &shouldExit)
+{
+    while (const std::optional<sf::Event> event = window.pollEvent())
+    {
+        if (event->is<sf::Event::Closed>() ||
+            (event->is<sf::Event::KeyPressed>() &&
+             event->getIf<sf::Event::KeyPressed>()->code == sf::Keyboard::Key::Escape))
+        {
+            shouldExit = true;
+            window.close();
+        }
+    }
+}
+
+// Move the ball and platform, check for collisions, and remove hit bricks from the vector.
+void updateGame(Ball &ball, Platform &platform, std::vector<Brick> &bricks)
+{
+    ball.moveBall();
+    platform.movePlatform();
+
+    testCollision(ball, platform);
+
+    for (auto &brick : bricks)
+        testCollision(ball, brick);
+
+    /** Using erase-move idiom to remove all hit bricks from bricks vector
+     *   effectively remove range from first destroyed brick to last.
+     *   use of erase() and remove_if()
+     *   auto iterator = remove_if(begin(bricks), end(bricks), [](const Brick& mBrick) return mBrick.destroyed;})
+     */
+
+    bricks.erase(std::remove_if(bricks.begin(), bricks.end(), [](const Brick &b)
+                                { return b.hasBeenHit; }),
+                 bricks.end());
+}
+
+// Draw the main menu with a simple highlighted selection.
+void drawMenu(sf::RenderWindow &window,
+              const sf::Text &titleText,
+              const sf::Text &startText,
+              const sf::Text &exitText,
+              int selectedOption)
+{
+    window.clear(sf::Color::Black);
+    window.draw(titleText);
+
+    sf::Text selectedStart = startText;
+    sf::Text selectedExit = exitText;
+
+    selectedStart.setFillColor(selectedOption == 0 ? sf::Color::Yellow : sf::Color::White);
+    selectedExit.setFillColor(selectedOption == 1 ? sf::Color::Yellow : sf::Color::White);
+
+    window.draw(selectedStart);
+    window.draw(selectedExit);
+    window.display();
+}
+
+void renderGame(sf::RenderWindow &window,
+                sf::RectangleShape &wallpaper,
+                const Ball &ball,
+                const Platform &platform,
+                const std::vector<Brick> &bricks,
+                const sf::Text &scoreText,
+                const sf::Text &escText)
+{
+    window.clear();
+    window.draw(wallpaper);
+    window.draw(ball.ballShape);
+    window.draw(platform.rectangle);
+    window.draw(scoreText);
+    window.draw(escText);
+
+    for (const auto &brick : bricks)
+        window.draw(brick.brickShape);
+
+    window.display();
 }
 
 /* to check if two shapes are intersecting (colliding).
